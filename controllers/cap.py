@@ -327,6 +327,11 @@ def alert():
                         S3OptionsFilter("info.event_type_id",
                                         options = event_type_options,
                                         ),
+                        S3OptionsFilter("scope",
+                                        ),
+                        S3OptionsFilter("msg_type",
+                                        default = "Alert",
+                                        ),
                         ]
                     s3.crud_strings["cap_alert"].title_list = T("Alerts Hub")
                     s3base.S3CRUD.action_buttons(r, deletable=False)
@@ -441,6 +446,7 @@ def alert():
                               "info_parameter.value",
                               "area.name",
                               "resource.resource_desc",
+                              "resource.uri",
                               "resource.image",
                               "resource.doc_id",
                               ]
@@ -670,6 +676,9 @@ def alert():
                         return (
                             component("Resource Description",
                                       resource_desc,
+                                      ),
+                            component("Resource Link",
+                                      info["cap_resource.uri"],
                                       ),
                             component("Attached Image",
                                       info["cap_resource.image"],

@@ -1932,9 +1932,9 @@ class S3Msg(object):
 
     # -------------------------------------------------------------------------
     @staticmethod
-    def poll_rss(channel_id):
+    def feed_parser(channel):
         """
-            Fetches all new messages from a subscribed RSS Feed
+            Helper method to parse the (non)-authenticated feeds
         """
 
         db = current.db
@@ -1994,10 +1994,35 @@ class S3Msg(object):
 
         if d.bozo:
             # Something doesn't seem right
-            S3Msg.update_channel_status(channel_id,
+            S3Msg.update_channel_status(channel.channel_id,
                                         status=d.bozo_exception.message,
                                         period=(300, 3600))
             return
+
+        return d
+
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def poll_rss(channel_id):
+        """
+            Fetches all new messages from a subscribed RSS Feed
+        """
+
+        db = current.db
+        s3db = current.s3db
+        table = s3db.msg_rss_channel
+        query = (table.channel_id == channel_id)
+        channel = db(query).select(table.channel_id,
+                                   table.date,
+                                   table.etag,
+                                   table.url,
+                                   table.username,
+                                   table.password,
+                                   limitby=(0, 1)).first()
+        if not channel:
+            return "No Such RSS Channel: %s" % channel_id
+
+        d = S3Msg.feed_parser(channel)
 
         # Update ETag/Last-polled
         now = current.request.utcnow
@@ -2016,6 +2041,8 @@ class S3Msg(object):
         ginsert = gtable.insert
         mtable = db.msg_rss
         minsert = mtable.insert
+        ltable = db.msg_rss_link
+        linsert = ltable.insert
         update_super = s3db.update_super
 
         # Is this channel connected to a parser?
@@ -2050,6 +2077,9 @@ class S3Msg(object):
                 content = content[0].value
             else:
                 content = entry.get("description", None)
+
+            # Get links - these can be multiple with certain type
+            links = entry.get("links", [])
 
             # Consider using dateutil.parser.parse(entry.get("published"))
             # http://www.deadlybloodyserious.com/2007/09/feedparser-v-django/
@@ -2115,6 +2145,24 @@ class S3Msg(object):
                                                   tags = tags,
                                                   # @ToDo: Enclosures
                                                   )
+                query_ = (ltable.rss_id == exists.id)
+                for link_ in links:
+                    url_ = link_["url"]
+                    type_ = link_["type"]
+                    query = query_ & (ltable.url == url_) & \
+                            (ltable.type == type_)
+                    set = db(query)
+                    row = set.select(ltable.id, limitby=(0, 1)).first()
+                    if row:
+                        set.update(rss_id = exists.id,
+                                   url = url_,
+                                   type = type_)
+                    else:
+                        linsert(rss_id = exists.id,
+                                url = url_,
+                                type = type_,
+                                )
+                db(ltable.rss_id == exists.id).update()
                 if parser:
                     pinsert(message_id = exists.message_id,
                             channel_id = channel_id)
@@ -2132,6 +2180,11 @@ class S3Msg(object):
                               )
                 record = dict(id=_id)
                 update_super(mtable, record)
+                for link_ in links:
+                    linsert(rss_id = _id,
+                            url = link_["url"],
+                            type = link_["type"],
+                            )
                 if parser:
                     pinsert(message_id = record["message_id"],
                             channel_id = channel_id)
