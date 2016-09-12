@@ -2484,6 +2484,27 @@ class S3Config(Storage):
         """
         return self.cap.get("use_ack", False)
 
+    def get_cap_form_bulltin(self):
+        """
+            Name of the method that is used to generate the bulletin for this deployment
+        """
+
+        return self.cap.get("form_bulletin")
+
+    def get_cap_form_bulltin_officer(self):
+        """
+            Name of the officer who is responsible to issue the bulletin
+        """
+
+        return self.cap.get("form_bulltin_officer", "Name of Officer goes here")
+
+    def get_cap_form_bulltin_officer_designation(self):
+        """
+            Designation of the officer who is responsible to issue the bulletin
+        """
+
+        return self.cap.get("form_bulltin_officer_designation", "Designation goes here")
+
     # -------------------------------------------------------------------------
     # CMS: Content Management System
     #
