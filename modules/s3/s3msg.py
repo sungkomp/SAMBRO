@@ -2311,7 +2311,7 @@ class S3Msg(object):
                                       ).first()
         if old_status:
             # Update
-            if status[0] == "+":
+            if status and status[0] == "+":
                 # Increment status if-numeric
                 old_status = old_status.status
                 try:
