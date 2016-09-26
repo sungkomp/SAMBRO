@@ -109,7 +109,7 @@ def config(settings):
         #("prs", "دری"),        # Dari
         #("ps", "پښتو"),        # Pashto
         #("tet", "Tetum"),
-        #("th", "ภาษาไทย"),        # Thai
+        ("th", "ภาษาไทย"),        # Thai
         ("tl", "Tagalog"), # Filipino
         #("vi", "Tiếng Việt"),   # Vietnamese
         #("zh-cn", "中文 (简体)"),
