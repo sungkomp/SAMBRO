@@ -1954,7 +1954,7 @@ class S3Msg(object):
     @staticmethod
     def feed_parser(channel):
         """
-            Helper method to parse the (non)-authenticated feeds
+           Helper method to parse the (non)-authenticated feeds
         """
 
         db = current.db
