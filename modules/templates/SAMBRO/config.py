@@ -470,8 +470,8 @@ def config(settings):
                 get_user_id = current.auth.s3_get_user_id
                 query_ = (gtable.id == mtable.group_id) & \
                          (mtable.person_id == ptable.id) & \
-                         (gtable.deleted != True) &\
-                         (mtable.deleted != True) &\
+                         (gtable.deleted != True) & \
+                         (mtable.deleted != True) & \
                          (ptable.deleted != True)
                 count = len(addresses)
                 if count == 1:
@@ -480,6 +480,10 @@ def config(settings):
                     query = query_ & (gtable.id.belongs(addresses))
                 rows = db(query).select(ptable.pe_id)
                 subject = get_email_subject(arow, system=False)
+
+                # Create attachment
+                (file_path, document_id) = _create_attachments(alert_id)
+
                 if settings.get_cap_use_ack():
                     for row in rows:
                         ack_id = create_ack(alert_id, get_user_id(pe_id=row.pe_id))
@@ -489,7 +493,12 @@ def config(settings):
                                                                     system=False)),
                                                     "</html>")
                         sms_content = get_sms_content(arow, ack_id=ack_id, system=False)
-                        send_by_pe_id(row.pe_id, subject, email_content)
+                        send_by_pe_id(row.pe_id,
+                                      subject,
+                                      email_content,
+                                      file_path = file_path if file_path else "",
+                                      document_id = document_id if document_id else None,
+                                      )
                         try:
                             send_by_pe_id(row.pe_id, subject, sms_content, contact_method="SMS")
                         except ValueError:
@@ -501,7 +510,12 @@ def config(settings):
                                                 "</html>")
                     sms_content = get_sms_content(arow, system=False)
                     for row in rows:
-                        send_by_pe_id(row.pe_id, subject, email_content)
+                        send_by_pe_id(row.pe_id,
+                                      subject,
+                                      email_content,
+                                      file_path = file_path if file_path else "",
+                                      document_id = document_id if document_id else None,
+                                      )
                         try:
                             send_by_pe_id(row.pe_id, subject, sms_content, contact_method="SMS")
                         except ValueError:
@@ -1351,5 +1365,48 @@ T("""%(status)s %(message_type)s for %(area_description)s with %(priority)s prio
                         nvalue = value
 
                 return nvalue
+
+    # -------------------------------------------------------------------------
+    def _create_attachments(alert_id):
+        """ 
+            Creates CAP file as attachment to be sent with the email 
+            returns file_path to CAP file and document_id for the same as tuple
+        """
+
+        import os
+        s3db = current.s3db
+        request = current.request
+        tablename = "cap_alert"
+        path_join = os.path.join
+
+        resource = s3db.resource(tablename)
+        resource.add_filter(FS("id") == alert_id)
+        cap_xml = resource.export_xml(stylesheet=path_join(request.folder, "static", "formats", "cap", "export.xsl"),
+                                      pretty_print=True)
+        file_path = path_join(request.folder,
+                              "uploads", "%s_%s.cap" % (tablename, s3_str(alert_id)))
+        file = open(file_path, "w+")
+        file.write(cap_xml)
+        file.close()
+
+        # Insert into the doc_entity
+        doc_data = {"instance_type": "cap_resource"}
+        etable = s3db.doc_entity
+        doc_id = etable.insert(**doc_data)
+        record = dict(id = doc_id)
+        s3db.update_super(etable, record)
+
+        # Create doc_document record
+        dtable = s3db.doc_document
+        file = open(file_path, "a+")
+        document_data = {"doc_id": doc_id,
+                         "file": file,
+                         }
+        document_id = dtable.insert(**document_data)
+        record = current.db(dtable.id == document_id).select(dtable.file,
+                                                             limitby=(0, 1)).first()
+        file.close()
+        os.remove(file_path)
+        return (path_join(request.folder, "uploads", record.file), document_id)
 
 # END =========================================================================

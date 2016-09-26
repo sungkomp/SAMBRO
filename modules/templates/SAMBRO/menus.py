@@ -95,7 +95,7 @@ class S3MainMenu(default.S3MainMenu):
                 elif has_role("ALERT_APPROVER"):
                     menus_.extend([alerting_menu,
                                    alert_hub_menu,
-                                   MM("Review Alerts", c="cap", f="alert", m="review"),
+                                   MM("Approve Alerts", c="cap", f="alert", m="review"),
                                    MM("View Approved Alerts", c="cap", f="alert",
                                       vars={"~.approved_by__ne": None}
                                       ),
@@ -215,32 +215,40 @@ class S3OptionsMenu(default.S3OptionsMenu):
     def cap():
         """ CAP menu """
 
-        s3_has_role = current.auth.s3_has_role
-        cap_editors = lambda i: s3_has_role("ALERT_EDITOR") or \
-                                s3_has_role("ALERT_APPROVER")
-
-        return M(c="cap", check=cap_editors)(
-                    M("Alerts", f="alert",
-                      check=cap_editors)(
-                        M("Create", m="create"),
-                        M("Import from Feed URL", m="import_feed", p="create",
-                          check=cap_editors),
-                    ),
-                    M("Templates", f="template")(
-                        M("Create", m="create",
-                          restrict=["ADMIN"]),
-                    ),
-                    M("Warning Classifications", f="warning_priority",
-                      restrict=["ADMIN"])(
-                        M("Create", m="create"),
-                        M("Import from CSV", m="import", p="create"),
-                    ),
-                    M("Predefined Alert Area", f="area", vars={"~.is_template": True},
-                      restrict=["ADMIN"])(
-                        M("Create", m="create"),
-                        M("Import from CSV", m="import", p="create"),
-                    ),
-                )
+        if current.request.get_vars["~.external"] == "True":
+            # Alert Hub
+            return M(c="cap")(
+                        M("Alert Hub", f="alert", vars={"~.external": True})(
+                            M("Common Operating Picture", c="default",
+                              f="index", args=["alert_hub_cop"]),
+                        ),
+                    )
+        else:
+            s3_has_role = current.auth.s3_has_role
+            cap_editors = lambda i: s3_has_role("ALERT_EDITOR") or \
+                                    s3_has_role("ALERT_APPROVER")
+            return M(c="cap", check=cap_editors)(
+                        M("Alerts", f="alert",
+                          check=cap_editors)(
+                            M("Create", m="create"),
+                            M("Import from Feed URL", m="import_feed", p="create",
+                              check=cap_editors),
+                        ),
+                        M("Templates", f="template")(
+                            M("Create", m="create",
+                              restrict=["ADMIN"]),
+                        ),
+                        M("Warning Classifications", f="warning_priority",
+                          restrict=["ADMIN"])(
+                            M("Create", m="create"),
+                            M("Import from CSV", m="import", p="create"),
+                        ),
+                        M("Predefined Alert Area", f="area", vars={"~.is_template": True},
+                          restrict=["ADMIN"])(
+                            M("Create", m="create"),
+                            M("Import from CSV", m="import", p="create"),
+                        ),
+                    )
 
     # -------------------------------------------------------------------------
     @staticmethod

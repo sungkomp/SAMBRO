@@ -369,6 +369,8 @@ class S3Msg(object):
                       subject = "",
                       message = "",
                       contact_method = "EMAIL",
+                      file_path = "",
+                      document_id = None,
                       from_address = None,
                       system_generated = False):
         """
@@ -400,6 +402,12 @@ class S3Msg(object):
             record = dict(id=_id)
             s3db.update_super(table, record)
             message_id = record["message_id"]
+            if document_id:
+                atable = s3db.msg_attachment
+                _id = atable.insert(message_id=message_id,
+                                    document_id=document_id,
+                                    file_path=file_path if file_path else None,
+                                    )
         elif contact_method == "SMS":
             table = s3db.msg_sms
             _id = table.insert(body=message,
@@ -513,6 +521,7 @@ class S3Msg(object):
                               message,
                               outbox_id,
                               message_id,
+                              attachments = [],
                               organisation_id = None,
                               contact_method = contact_method,
                               channel_id = channel_id,
@@ -548,6 +557,7 @@ class S3Msg(object):
                                            subject,
                                            message,
                                            sender = from_address,
+                                           attachments = attachments,
                                            )
                 elif contact_method == "SMS":
                     if lookup_org:
@@ -682,13 +692,23 @@ class S3Msg(object):
         organisation_id = None
 
         for row in rows:
-
+            attachments = []
             status = True
+            message_id = row.msg_outbox.message_id
 
             if contact_method == "EMAIL":
                 subject = row["msg_email.subject"] or ""
                 message = row["msg_email.body"] or ""
                 from_address = row["msg_email.from_address"] or ""
+                attachment_table = s3db.msg_attachment
+                query = (attachment_table.message_id == message_id) & \
+                        (attachment_table.file_path != True) & \
+                        (attachment_table.deleted != True)
+                arows = db(query).select(attachment_table.file_path)
+                if len(arows):
+                    mail = current.mail
+                    for arow in arows:
+                        attachments.append(mail.Attachment(arow.file_path))
             elif contact_method == "SMS":
                 subject = None
                 message = row["msg_sms.body"] or ""
@@ -710,7 +730,6 @@ class S3Msg(object):
 
             row = row["msg_outbox"]
             pe_id = row.pe_id
-            message_id = row.message_id
 
             if entity_type == "pr_person":
                 # Send the message to this person
@@ -723,6 +742,7 @@ class S3Msg(object):
                                     message_id,
                                     organisation_id = organisation_id,
                                     from_address = from_address,
+                                    attachments = attachments,
                                     )
                 except:
                     status = False
